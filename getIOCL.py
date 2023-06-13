@@ -3,6 +3,8 @@ import requests
 from datetime import datetime
 import shutil
 import os
+import logging
+import logging.handlers
 
 def getCurrentTimeStamp():
     current_datetime = datetime.now()
@@ -85,42 +87,56 @@ def getDataForDistrict(id):
     else:
         return None
 
-#Get the list of the Districts from the CSV file
-Districts = []
-with open('input.csv', 'r') as csvfile:
-    csvreader = csv.DictReader(csvfile, delimiter='|')
-    for row in csvreader:
-        Districts.append(row)
-headers = ["RO Code","Petrol Pump Name","Address","Dealer/Partner/Operator/Contact Person Name","Contact No",
-               "Petrol Price","Diesel Price","XTRAPREMIUM Price","XTRAMILE Price","XP100 Price",
-               "XP95 Price","XG Price","E100 Price","District","State","State Office","Divisional Office",
-               "Sales Area","Sales Officer Contact No", "Latitude", "Longitude"]
-    
-idx = 0
-recordCount = 0
-tempPath = 'IOCL.csv'
-with open(tempPath, 'w', newline='\n', encoding='UTF-8') as csvfile:
-    csvwriter = csv.writer(csvfile, delimiter='|')
-    csvwriter.writerow(headers)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger_file_handler = logging.handlers.RotatingFileHandler(
+    "status.log",
+    maxBytes=1024 * 1024,
+    backupCount=1,
+    encoding="utf8",
+)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger_file_handler.setFormatter(formatter)
+logger.addHandler(logger_file_handler)
+if __name__ == "__main__":
 
-    #for each district
-    for d in Districts:
-        id = d['id']
-        name = d['district']
-        print('Processing {0} ({1})'.format(name, idx))
-        #need to get the data
-        data = getDataForDistrict(id)
-        recordCount += len(data)
-        #write the data
-        if(data is not None):
-            #write this data
-            csvwriter.writerows(data)
-        idx = idx + 1
+    #Get the list of the Districts from the CSV file
+    Districts = []
+    with open('input.csv', 'r') as csvfile:
+        csvreader = csv.DictReader(csvfile, delimiter='|')
+        for row in csvreader:
+            Districts.append(row)
+    headers = ["RO Code","Petrol Pump Name","Address","Dealer/Partner/Operator/Contact Person Name","Contact No",
+                "Petrol Price","Diesel Price","XTRAPREMIUM Price","XTRAMILE Price","XP100 Price",
+                "XP95 Price","XG Price","E100 Price","District","State","State Office","Divisional Office",
+                "Sales Area","Sales Officer Contact No", "Latitude", "Longitude"]
+        
+    idx = 0
+    recordCount = 0
+    tempPath = 'IOCL.csv'
+    with open(tempPath, 'w', newline='\n', encoding='UTF-8') as csvfile:
+        csvwriter = csv.writer(csvfile, delimiter='|')
+        csvwriter.writerow(headers)
 
-if(recordCount>0):
-    #Move the IOCL file to the archive folder
-    destination_path = os.path.join('archive', 'IOCL_{0}.csv'.format(getCurrentTimeStamp()))
-    shutil.move(tempPath, destination_path)
-else:
-    #delete this file
-    os.remove(tempPath)
+        #for each district
+        for d in Districts:
+            id = d['id']
+            name = d['district']
+            logger.info('Processing {0} ({1})'.format(name, idx))
+            #need to get the data
+            data = getDataForDistrict(id)
+            recordCount += len(data)
+            #write the data
+            if(data is not None):
+                #write this data
+                csvwriter.writerows(data)
+            idx = idx + 1
+
+    if(recordCount>0):
+        logger.info('Total Records: {0}'.format(recordCount))
+        #Move the IOCL file to the archive folder
+        destination_path = os.path.join('archive', 'IOCL_{0}.csv'.format(getCurrentTimeStamp()))
+        shutil.move(tempPath, destination_path)
+    else:
+        #delete this file
+        os.remove(tempPath)
